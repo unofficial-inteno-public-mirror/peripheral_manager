@@ -18,7 +18,8 @@
 
 int debug_level = 0;
 
-static const char *config_path = "/lib/db/config";
+static const char *config_hw_path = "/lib/db/config";
+static const char *config_path = "/etc/config";
 static const char *config_file = "hw";
 
 static char *ubus_socket;
@@ -32,7 +33,8 @@ void print_usage(char *prg_name) {
         printf("  Options: \n");
         printf("      -f, --foreground\tDon't fork off as a daemon.\n");
         printf("      -d, --debug=NUM\tSet debug level. Higher = more output\n");
-        printf("      -c, --config=FILE\tConfig file to use. default = %s/%s\n", config_path, config_file);
+        printf("      -c, --config=FILE\tConfig file to use for bard HW file. default = %s/%s\n", config_hw_path, config_file);
+	printf("      -p, --path=DIR\tPath to config files. default = %s/\n", config_path);
         printf("      -s, --socket=FILE\tSet the unix domain socket to connect to for ubus\n");
         printf("      -h\t\tShow this help screen.\n");
         printf("\n");
@@ -53,12 +55,13 @@ int main(int argc, char **argv)
                         {"verbose",     no_argument, 0, 'v'},
                         {"debug", required_argument, 0, 'd'},
                         {"config",required_argument, 0, 'c'},
+			{"path",  required_argument, 0, 'p'},
                         {"socket",required_argument, 0, 's'},
                         {"help",	no_argument, 0, 'h'},
                         {0, 0, 0, 0}
                 };
 
-                ch = getopt_long(argc, argv, "hvfhd:c:s:",
+                ch = getopt_long(argc, argv, "hvfhd:c:s:p:",
                                 long_options, &option_index);
 
 		if (ch == -1)
@@ -74,7 +77,10 @@ int main(int argc, char **argv)
 
                 case 'c':
 			config_file = basename(optarg);
-			config_path = dirname(optarg);
+			config_hw_path = dirname(optarg);
+			break;
+                case 'p':
+			config_path = optarg;
 			break;
                 case 's':
 			ubus_socket = optarg;
@@ -145,9 +151,9 @@ int main(int argc, char **argv)
 	}
 
 	/* open configuration file */
-	uci_ctx = ucix_init_path(config_path , config_file, 0 );
+	uci_ctx = ucix_init_path(config_hw_path , config_file, 0 );
 	if (! uci_ctx ) {
-		syslog(LOG_ERR,"Failed to load config file \"%s/%s\"\n", config_path, config_file);
+		syslog(LOG_ERR,"Failed to load config file \"%s/%s\"\n", config_hw_path, config_file);
 		exit(1);
 	}
 
@@ -167,7 +173,7 @@ int main(int argc, char **argv)
 
 	catv_monitor_set_socket(ubus_socket);
 
-	server_start(uci_ctx, ubus_ctx);
+	server_start(uci_ctx, ubus_ctx, config_path);
 
 	ubus_free(ubus_ctx);
 
