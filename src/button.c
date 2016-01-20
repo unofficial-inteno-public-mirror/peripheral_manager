@@ -2,6 +2,8 @@
 #include "config.h"
 #include <syslog.h>
 #include <time.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include "log.h"
 #include "button.h"
 #include "led.h"
@@ -12,7 +14,11 @@
 static struct ubus_context *global_ubus_ctx;
 static struct blob_buf bblob;
 
+static char *config_file;       /* path+name of the buttons config file */
+static time_t config_mtime_sec; /* mtime of config file */
+
 static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed);
+static void reread_config( void );
 
 static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed)
 {
@@ -82,7 +88,6 @@ static struct button_drv *get_drv_button(const char *name)
         return NULL;
 }
 
-#if 0
 static struct function_button *get_button(const char *name)
 {
 	struct list_head *i;
@@ -93,8 +98,6 @@ static struct function_button *get_button(const char *name)
 	}
         return NULL;
 }
-#endif
-
 
 //! Read state for single button
 static button_state_t read_button_state(const char *name)
@@ -274,6 +277,7 @@ static void button_handler(struct uloop_timeout *timeout)
 {
  	struct list_head *i;
 	int r;
+        struct stat stat_buf;
 //        DBG(1, "");
 
 #ifdef HAVE_BOARD_H
@@ -284,6 +288,14 @@ static void button_handler(struct uloop_timeout *timeout)
         /* same for px3220 */
         px3220_check();
 #endif
+
+        /* check to see if the config files has been changed */
+        if (0 == stat(config_file, &stat_buf)) {
+                if (config_mtime_sec != stat_buf.st_mtim.tv_sec) {
+                        reread_config();
+                        config_mtime_sec = stat_buf.st_mtim.tv_sec;
+                }
+        }
 
         /* clean out indicator status, set by any valid press again if we find it */
         led_pressindicator_set(PRESS_NONE);
@@ -426,16 +438,26 @@ void button_init( struct server_ctx *s_ctx)
 {
         struct uci_context *button_ctx = uci_alloc_context();
 	struct uci_package *button_package = NULL;
-        char config_file[1024];
+        char config_file_name[1024];
 	struct uci_element *elem;
         const char *s;
 	int default_minpress = 100;
+        struct stat stat_buf;
 
 	LIST_HEAD(buttonnames);
 
-        snprintf(config_file, 1024, "%s/%s", s_ctx->config_path, "buttons");
+        snprintf(config_file_name, 1024, "%s/%s", s_ctx->config_path, "buttons");
+        config_file = strdup(config_file_name);
 	if (uci_load(button_ctx, config_file, &button_package))
 		return;
+
+        /* save the mtime of the config file so we know later if it has changed */
+        if (-1 == stat(config_file, &stat_buf)) {
+                syslog(LOG_WARNING, "Could not stat button %s",
+                               config_file);
+                return;
+        }
+        config_mtime_sec = stat_buf.st_mtim.tv_sec;
 
         uci_foreach_element(&button_package->sections, elem) {
                 struct function_button *function;
@@ -576,3 +598,47 @@ void button_init( struct server_ctx *s_ctx)
         dump_buttons_list();
 }
 
+
+/* we are only interested in reading out the enable option for all buttons */
+static void reread_config( void )
+{
+        struct uci_context *button_ctx = uci_alloc_context();
+	struct uci_package *button_package = NULL;
+	struct uci_element *elem;
+
+        if (uci_load(button_ctx, config_file, &button_package)){
+                uci_free_context(button_ctx);
+                return;
+        }
+        uci_foreach_element(&button_package->sections, elem) {
+                struct uci_section *sec = uci_to_section(elem);
+                int new_enable = 0;
+                struct function_button *button;
+                const char * s;
+
+                if (! sec->e.name)
+                {
+                        syslog(LOG_WARNING, "Button config without a name, check %s",
+                               config_file);
+                        continue;
+                }
+
+                /* read out enable */
+                s = uci_lookup_option_string(button_ctx, sec, "enable");
+                if (s){
+                        new_enable =  strtol(s,0,0);
+                }else
+                        new_enable =  1; /* if value do not exist its assumed to be enabled */
+
+                /* get current value and change it */
+                button = get_button(sec->e.name);
+                if (button) {
+                        if (button->enable != new_enable){
+                                button->enable = new_enable;
+                                DBG(1, "%s: change enable to = %d", button->name, new_enable);
+                        }
+                }
+        }
+
+        uci_free_context(button_ctx);
+}
