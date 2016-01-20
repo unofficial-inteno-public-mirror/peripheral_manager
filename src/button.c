@@ -40,6 +40,7 @@ struct function_button {
         int dimming;
         char *hotplug;
 	char *hotplug_long;
+        int enable;                             /* should this button be sent to the system or not */
         int minpress;
         int longpress;                          /* negative value means valid if  mintime < time < abs(longpress ) */
                                                 /* positive value means valid if time > longpreass */
@@ -315,11 +316,17 @@ static void button_handler(struct uloop_timeout *timeout)
                                         if (timer_started(drv_node)) {
                                                 DBG(1, " %s released", drv_node->drv->name);
                                                 if((r=timer_valid(drv_node, node->minpress, node->longpress))) {
-							button_ubus_interface_event(global_ubus_ctx, node->name, BUTTON_RELEASED);
+                                                        DBG(1, " %s released timer_valid=%d", drv_node->drv->name,r);
+
 							if(node->dimming)
 								led_dimming();
-                                                        DBG(1, " %s released timer_valid=%d", drv_node->drv->name,r);
-							button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+
+                                                        if (node->enable) {
+                                                                button_ubus_interface_event(global_ubus_ctx,
+                                                                                            node->name,
+                                                                                            BUTTON_RELEASED);
+                                                                button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+                                                        }
 						}
                                         }
                                         timer_stop(drv_node);
@@ -446,6 +453,15 @@ void button_init( struct server_ctx *s_ctx)
 		memset(function,0,sizeof(struct function_button));
 
                 function->name = strdup(sec->e.name);
+
+                /* read out enable */
+                s = uci_lookup_option_string(button_ctx, sec, "enable");
+                DBG(1, "%s: enable = [%s]", function->name, s);
+                if (s){
+                        function->enable =  strtol(s,0,0);
+                }else
+                        function->enable =  1; /* if value do not exist its assumed to be enabled */
+
 
                 /* read out dimming */
                 s = uci_lookup_option_string(button_ctx, sec, "dimming");
