@@ -6,8 +6,9 @@
 struct server_ctx {
 	struct uci_context *uci_ctx;
 	struct ubus_context *ubus_ctx;
+	const char *config_path;
 };
 
-void server_start( struct uci_context *uci_ctx, struct ubus_context *ubus_ctx);
+void server_start( struct uci_context *uci_ctx, struct ubus_context *ubus_ctx, const char *config_path);
 
 #endif /* SERVER_H */

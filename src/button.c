@@ -2,6 +2,8 @@
 #include "config.h"
 #include <syslog.h>
 #include <time.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include "log.h"
 #include "button.h"
 #include "led.h"
@@ -12,7 +14,11 @@
 static struct ubus_context *global_ubus_ctx;
 static struct blob_buf bblob;
 
+static char *config_file;       /* path+name of the buttons config file */
+static time_t config_mtime_sec; /* mtime of config file */
+
 static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed);
+static void reread_config( void );
 
 static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed)
 {
@@ -40,6 +46,7 @@ struct function_button {
         int dimming;
         char *hotplug;
 	char *hotplug_long;
+        int enable;                             /* should this button be sent to the system or not */
         int minpress;
         int longpress;                          /* negative value means valid if  mintime < time < abs(longpress ) */
                                                 /* positive value means valid if time > longpreass */
@@ -81,7 +88,6 @@ static struct button_drv *get_drv_button(const char *name)
         return NULL;
 }
 
-#if 0
 static struct function_button *get_button(const char *name)
 {
 	struct list_head *i;
@@ -92,8 +98,6 @@ static struct function_button *get_button(const char *name)
 	}
         return NULL;
 }
-#endif
-
 
 //! Read state for single button
 static button_state_t read_button_state(const char *name)
@@ -273,6 +277,7 @@ static void button_handler(struct uloop_timeout *timeout)
 {
  	struct list_head *i;
 	int r;
+        struct stat stat_buf;
 //        DBG(1, "");
 
 #ifdef HAVE_BOARD_H
@@ -284,8 +289,16 @@ static void button_handler(struct uloop_timeout *timeout)
         px3220_check();
 #endif
 
+        /* check to see if the config files has been changed */
+        if (0 == stat(config_file, &stat_buf)) {
+                if (config_mtime_sec != stat_buf.st_mtim.tv_sec) {
+                        reread_config();
+                        config_mtime_sec = stat_buf.st_mtim.tv_sec;
+                }
+        }
+
         /* clean out indicator status, set by any valid press again if we find it */
-        led_pressindicator_clear();
+        led_pressindicator_set(PRESS_NONE);
 
 	list_for_each(i, &buttons) {
                 struct list_head *j;
@@ -294,6 +307,7 @@ static void button_handler(struct uloop_timeout *timeout)
                 list_for_each(j, &node->drv_list) {
                         struct button_drv_list *drv_node = list_entry(j, struct button_drv_list, list);
                         if (drv_node->drv) {
+                                button_press_type_t time_type;
                                 button_state_t st = drv_node->drv->func->get_state(drv_node->drv);
 
                                 if (st == BUTTON_PRESSED ) {
@@ -302,18 +316,29 @@ static void button_handler(struct uloop_timeout *timeout)
                                                 DBG(1, " %s pressed", drv_node->drv->name);
 //						button_ubus_interface_event(global_ubus_ctx, node->name, BUTTON_PRESSED);
                                         }
-					if(timer_valid(drv_node, node->minpress, 0))
-						led_pressindicator_set();
+
+                                        time_type = timer_valid(drv_node, node->minpress, node->longpress);
+					if( time_type == BUTTON_PRESS_LONG )
+						led_pressindicator_set(PRESS_LONG);
+					if( time_type == BUTTON_PRESS_SHORT )
+						led_pressindicator_set(PRESS_SHORT);
                                 }
 
                                 if (st == BUTTON_RELEASED ) {
                                         if (timer_started(drv_node)) {
                                                 DBG(1, " %s released", drv_node->drv->name);
                                                 if((r=timer_valid(drv_node, node->minpress, node->longpress))) {
-							button_ubus_interface_event(global_ubus_ctx, node->name, BUTTON_RELEASED);
+                                                        DBG(1, " %s released timer_valid=%d", drv_node->drv->name,r);
+
 							if(node->dimming)
 								led_dimming();
-							button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+
+                                                        if (node->enable) {
+                                                                button_ubus_interface_event(global_ubus_ctx,
+                                                                                            node->name,
+                                                                                            BUTTON_RELEASED);
+                                                                button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+                                                        }
 						}
                                         }
                                         timer_stop(drv_node);
@@ -409,127 +434,163 @@ static struct ubus_object_type buttons_object_type = UBUS_OBJECT_TYPE("buttons",
 
 static struct ubus_object buttons_object = { .name = "buttons", .type = &buttons_object_type, .methods = buttons_methods, .n_methods = ARRAY_SIZE(buttons_methods), };
 
-
 void button_init( struct server_ctx *s_ctx)
 {
-	struct ucilist *node;
+        struct uci_context *button_ctx = uci_alloc_context();
+	struct uci_package *button_package = NULL;
+        char config_file_name[1024];
+	struct uci_element *elem;
+        const char *s;
+	int default_minpress = 100;
+        struct stat stat_buf;
+
 	LIST_HEAD(buttonnames);
-        int default_minpress = 0;
-        char *s;
-	int   r;
 
-	global_ubus_ctx=s_ctx->ubus_ctx;
+        snprintf(config_file_name, 1024, "%s/%s", s_ctx->config_path, "buttons");
+        config_file = strdup(config_file_name);
+	if (uci_load(button_ctx, config_file, &button_package))
+		return;
 
-	/* register buttons object with ubus */
-	if((r=ubus_add_object(s_ctx->ubus_ctx, &buttons_object)))
-		DBG(1,"Failed to add object: %s", ubus_strerror(r));
-
-        /* read out default global options */
-        s = ucix_get_option(s_ctx->uci_ctx, "hw" , "button_map", "minpress");
-        DBG(1, "default minpress = [%s]", s);
-        if (s){
-                default_minpress =  strtol(s,0,0);
+        /* save the mtime of the config file so we know later if it has changed */
+        if (-1 == stat(config_file, &stat_buf)) {
+                syslog(LOG_WARNING, "Could not stat button %s",
+                               config_file);
+                return;
         }
+        config_mtime_sec = stat_buf.st_mtim.tv_sec;
 
-        /* read function buttons from section button_map */
-	ucix_get_option_list(s_ctx->uci_ctx, "hw" ,"button_map", "buttonnames", &buttonnames);
-	list_for_each_entry(node, &buttonnames, list) {
+        uci_foreach_element(&button_package->sections, elem) {
                 struct function_button *function;
+                struct uci_section *sec = uci_to_section(elem);
+                struct uci_option *opt;
 
-//                DBG(1, "value = [%s]",node->val);
+                if (! sec->e.name)
+                {
+                        syslog(LOG_WARNING, "Button config without a name, check %s",
+                               config_file);
+                        continue;
+                }
 
 		function = malloc(sizeof(struct function_button));
 		memset(function,0,sizeof(struct function_button));
-                function->name = node->val;
+
+                function->name = strdup(sec->e.name);
+
+                /* read out enable */
+                s = uci_lookup_option_string(button_ctx, sec, "enable");
+                DBG(1, "%s: enable = [%s]", function->name, s);
+                if (s){
+                        function->enable =  strtol(s,0,0);
+                }else
+                        function->enable =  1; /* if value do not exist its assumed to be enabled */
+
 
                 /* read out dimming */
-                s = ucix_get_option(s_ctx->uci_ctx, "hw" , function->name, "dimming");
-                DBG(1, "dimming = [%s]", s);
+                s = uci_lookup_option_string(button_ctx, sec, "dimming");
+                DBG(1, "%s: dimming = [%s]", function->name, s);
                 if (s){
                         function->dimming = 1;
                 }else
                         function->dimming = 0;
 
                 /* read out minpress */
-                s = ucix_get_option(s_ctx->uci_ctx, "hw" , function->name, "minpress");
-                DBG(1, "minpress = [%s]", s);
+                s = uci_lookup_option_string(button_ctx, sec, "minpress");
+                DBG(1, "%s: minpress = [%s]", function->name, s);
                 if (s){
                         function->minpress =  strtol(s,0,0);
                 }else
                         function->minpress =  default_minpress;
 
                 /* read out long_press */
-                s = ucix_get_option(s_ctx->uci_ctx, "hw" , function->name, "longpress");
-                DBG(1, "longpress = [%s]", s);
+                s = uci_lookup_option_string(button_ctx, sec, "longpress");
+                DBG(1, "%s: longpress = [%s]", function->name, s);
                 if (s){
                         function->longpress =  strtol(s,0,0);
                 }
 
                 /* read out hotplug option */
-                s = ucix_get_option(s_ctx->uci_ctx, "hw" , function->name, "hotplug");
-                DBG(1, "hotplug = [%s]", s);
+                s = uci_lookup_option_string(button_ctx, sec, "hotplug");
+                DBG(1, "%s: hotplug = [%s]", function->name, s);
                 if (s){
-                        function->hotplug = s;
+                        function->hotplug = strdup(s);
                 }
 
 		/* read out hotplug option for longpress */
-		s = ucix_get_option(s_ctx->uci_ctx, "hw" , function->name, "hotplug_long");
-		DBG(1, "hotplug_long = [%s]", s);
+                s = uci_lookup_option_string(button_ctx, sec, "hotplug_long");
+		DBG(1, "%s: hotplug_long = [%s]", function->name, s);
 		if (s){
-			function->hotplug_long = s;
+			function->hotplug_long = strdup(s);
 		}
 
-                INIT_LIST_HEAD(&function->drv_list);
-
-                {
-                        struct ucilist *drv_node;
-                        LIST_HEAD(head);
+                /* read out list of driver buttons that need to be active to activate this
+                   button */
+                opt = uci_lookup_option(button_ctx, sec, "button");
+		DBG(1, "%s: button driver = option", function->name);
+                if (opt) {
+                        struct uci_element *e;
                         int num = 0;
+                        DBG(1, "option type %x ",(int)opt->type);
+                        DBG(1, "option section %p ",opt->section);
+                        DBG(1, "option elem-name[%s]",opt->e.name);
 
-                        /* read out all driver buttons that needs to be pressed for this button function. */
-                        ucix_get_option_list(s_ctx->uci_ctx, "hw" ,function->name, "button", &head);
+                        INIT_LIST_HEAD(&function->drv_list);
 
-                        list_for_each_entry(drv_node, &head, list) {
+                        uci_foreach_element(&opt->v.list, e) {
                                 struct button_drv_list *new_button;
-
-                                num++;
-                                DBG(1,"function %s -> drv button %s", function->name, drv_node->val);
+                                DBG(1,"e type %x",e->type);
+                                DBG(1,"e name %s",e->name);
 
                                 new_button = malloc(sizeof(struct button_drv_list));
                                 memset(new_button,0,sizeof(struct button_drv_list));
+                                DBG(1," A %ld %ld",sizeof(struct button_drv_list),sizeof(new_button));
 
-                                new_button->drv = get_drv_button(drv_node->val);
+                                new_button->drv = get_drv_button(e->name);
 
-                                if(new_button->drv == NULL){
+                                if(new_button->drv == NULL) {
                                         syslog(LOG_WARNING, "%s wanted drv button [%s] but it can't be found. check spelling.",
                                                function->name,
-                                               drv_node->val);
+                                               e->name);
+                                        free(new_button);
+                                }else {
+                                        num++;
+                                        list_add( &new_button->list, &function->drv_list);
                                 }
-
-                                list_add( &new_button->list, &function->drv_list);
                         }
-                        if (num == 0 )
+
+                        if (num == 0)
                                 syslog(LOG_WARNING, "Function  %s did not have any mapping to a driver button", function->name);
-                }
+
+                }else
+                        syslog(LOG_WARNING, "Function  %s did not have any mapping to a driver button", function->name);
 
                 list_add(&function->list, &buttons);
 
 		/* register each button with ubus */
                 {
                         struct ubus_object *ubo;
+                        int r;
                         char name[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN];
+
+                        /* register buttons object with ubus */
+                        if((r = ubus_add_object(s_ctx->ubus_ctx, &buttons_object)))
+                                DBG(1,"Failed to add object: %s", ubus_strerror(r));
+
                         ubo = malloc(sizeof(struct ubus_object));
                         memset(ubo, 0, sizeof(struct ubus_object));
 
-                        snprintf(name, UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN, "%s%s", UBUS_BUTTON_NAME_PREPEND, node->val);
+                        snprintf(name, UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN, "%s%s",
+                                 UBUS_BUTTON_NAME_PREPEND,
+                                 function->name);
                         ubo->name      = strdup(name);
                         ubo->methods   = button_methods;
                         ubo->n_methods = ARRAY_SIZE(button_methods);
                         ubo->type      = &button_object_type;
-                        if((r=ubus_add_object(s_ctx->ubus_ctx, ubo)))
+                        if((r = ubus_add_object(s_ctx->ubus_ctx, ubo)))
                                 DBG(1,"Failed to add object: %s", ubus_strerror(r));
                 }
         }
+
+	global_ubus_ctx=s_ctx->ubus_ctx;
 
 	uloop_timeout_set(&button_inform_timer, BUTTON_TIMEOUT);
 
@@ -537,3 +598,47 @@ void button_init( struct server_ctx *s_ctx)
         dump_buttons_list();
 }
 
+
+/* we are only interested in reading out the enable option for all buttons */
+static void reread_config( void )
+{
+        struct uci_context *button_ctx = uci_alloc_context();
+	struct uci_package *button_package = NULL;
+	struct uci_element *elem;
+
+        if (uci_load(button_ctx, config_file, &button_package)){
+                uci_free_context(button_ctx);
+                return;
+        }
+        uci_foreach_element(&button_package->sections, elem) {
+                struct uci_section *sec = uci_to_section(elem);
+                int new_enable = 0;
+                struct function_button *button;
+                const char * s;
+
+                if (! sec->e.name)
+                {
+                        syslog(LOG_WARNING, "Button config without a name, check %s",
+                               config_file);
+                        continue;
+                }
+
+                /* read out enable */
+                s = uci_lookup_option_string(button_ctx, sec, "enable");
+                if (s){
+                        new_enable =  strtol(s,0,0);
+                }else
+                        new_enable =  1; /* if value do not exist its assumed to be enabled */
+
+                /* get current value and change it */
+                button = get_button(sec->e.name);
+                if (button) {
+                        if (button->enable != new_enable){
+                                button->enable = new_enable;
+                                DBG(1, "%s: change enable to = %d", button->name, new_enable);
+                        }
+                }
+        }
+
+        uci_free_context(button_ctx);
+}

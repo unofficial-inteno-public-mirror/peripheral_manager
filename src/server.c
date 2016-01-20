@@ -23,12 +23,13 @@ void vox_init(struct server_ctx *);
 struct catv_handler *catv_h;
 struct sfp_handler *sfp_h;
 
-void server_start(struct uci_context *uci_ctx, struct ubus_context *ubus_ctx)
+void server_start(struct uci_context *uci_ctx, struct ubus_context *ubus_ctx, const char *config_path)
 
 {
 	DBG(1, "init server context.");
 	server.uci_ctx = uci_ctx;
 	server.ubus_ctx = ubus_ctx;
+	server.config_path = config_path;
 
 	DBG(1, "run init function for all hardware drivers.");
 
