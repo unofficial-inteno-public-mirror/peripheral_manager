@@ -532,6 +532,11 @@ void button_init( struct server_ctx *s_ctx)
                         struct ubus_object *ubo;
                         int r;
                         char name[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN];
+
+                        /* register buttons object with ubus */
+                        if((r = ubus_add_object(s_ctx->ubus_ctx, &buttons_object)))
+                                DBG(1,"Failed to add object: %s", ubus_strerror(r));
+
                         ubo = malloc(sizeof(struct ubus_object));
                         memset(ubo, 0, sizeof(struct ubus_object));
 
@@ -545,7 +550,6 @@ void button_init( struct server_ctx *s_ctx)
                         if((r = ubus_add_object(s_ctx->ubus_ctx, ubo)))
                                 DBG(1,"Failed to add object: %s", ubus_strerror(r));
                 }
-
         }
 
 	global_ubus_ctx=s_ctx->ubus_ctx;
