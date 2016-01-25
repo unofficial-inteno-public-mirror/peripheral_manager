@@ -318,10 +318,12 @@ static void button_handler(struct uloop_timeout *timeout)
                                         }
 
                                         time_type = timer_valid(drv_node, node->minpress, node->longpress);
-					if( time_type == BUTTON_PRESS_LONG )
-						led_pressindicator_set(PRESS_LONG);
-					if( time_type == BUTTON_PRESS_SHORT )
-						led_pressindicator_set(PRESS_SHORT);
+                                        if (node->enable) {
+                                                if( time_type == BUTTON_PRESS_LONG )
+                                                        led_pressindicator_set(PRESS_LONG);
+                                                if( time_type == BUTTON_PRESS_SHORT )
+                                                        led_pressindicator_set(PRESS_SHORT);
+                                        }
                                 }
 
                                 if (st == BUTTON_RELEASED ) {
