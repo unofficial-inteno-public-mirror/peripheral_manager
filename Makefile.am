@@ -29,7 +29,7 @@ peripheral_manager_SOURCES = \
 
 if BRCM_BOARD
 
-bin_PROGRAMS += vox_test gpio_test
+bin_PROGRAMS += vox_test gpio_test eco_bug
 
 peripheral_manager_SOURCES += \
 	src/gpio_led.c \
@@ -65,6 +65,11 @@ gpio_test_SOURCES = \
 	src/i2c.h \
 	src/sx9512.c \
 	src/sx9512.h
+
+eco_bug_SOURCES = \
+	src/eco_bug.c \
+	src/gpio.c \
+	src/gpio.h
 
 endif
 
