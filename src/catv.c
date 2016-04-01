@@ -18,11 +18,18 @@
 #include <uci.h>
 #include "ucix.h"
 
-
 #include "i2c.h"
 #include "catv.h"
 #include "log.h"
 
+
+/* Vendor part number, this is a left space padded field in the hardware, use strlncmp */
+static const char *vendor_part[] = {"OHR-1001",      // MODEL_302
+                                    "OHR-1001F"};      // MODEL_332
+typedef enum {
+	MODEL_302,
+        MODEL_332,
+} model_t;
 
 struct catv_handler
 {
@@ -961,10 +968,25 @@ static const struct blobmsg_policy filter_policy[] = {
 static void catv_filter(struct catv_handler *h,int num)
 {
     int status;
-    status = i2c_smbus_read_byte_data(h->i2c_a2,73);
-    status = status &  ~(0x10 | 0x20 | 0x40);
-    status = status | (1 <<(3 + num));
-    i2c_smbus_write_byte_data(h->i2c_a2, 73, status);
+    int ret;
+    char vpn[20+1];
+
+    memset(vpn, 0 , 20+1);
+
+    /* read out the vendor part number string */
+    ret = i2c_smbus_read_i2c_block_data(h->i2c_a0, 33, 20, (__u8*)vpn);
+
+    if ( ret >= 0 ) {
+            /* bail out if MODEL_302 */
+            if (strncmp(vpn, vendor_part[MODEL_302], strlen(vendor_part[MODEL_302]) ) == 0)
+                    return;
+
+            /* set filter */
+            status = i2c_smbus_read_byte_data(h->i2c_a2,73);
+            status = status &  ~(0x10 | 0x20 | 0x40);
+            status = status | (1 <<(3 + num));
+            i2c_smbus_write_byte_data(h->i2c_a2, 73, status);
+    }
 }
 
 static int catv_set_filter_method(struct ubus_context *ubus_ctx, struct ubus_object *obj,
