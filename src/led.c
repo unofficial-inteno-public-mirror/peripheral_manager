@@ -26,6 +26,7 @@ typedef enum {
     LEDS_RESET,
     LEDS_ALLON,
     LEDS_ALLOFF,
+    LEDS_ALLFLASH,
     LEDS_MAX,
 } leds_state_t;
 
@@ -39,7 +40,7 @@ static const char* const led_states[LED_STATES_MAX] =
 
 /* Names for leds_state_t */
 static const char* const leds_states[LEDS_MAX] =
-{ "normal", "proximity", "silent", "info", "test", "production", "reset", "allon" , "alloff"};
+{ "normal", "proximity", "silent", "info", "test", "production", "reset", "allon" , "alloff", "allflash"};
 
 /* lowest level, contain states, timers,pointer to driver for a single physical led.*/
 struct led {
@@ -155,6 +156,37 @@ static void all_leds_off(void) {
 
 static void all_leds_on(void) {
 	all_leds(ON);
+}
+
+#define ALLFLASH_TIMEOUT 250
+static void allflash_handler(struct uloop_timeout *timeout);
+static struct uloop_timeout allflash_timer = { .cb = allflash_handler };
+
+static void allflash_handler(struct uloop_timeout *timeout) {
+	static int cnt = 0;
+	static led_state_t state = OFF;
+
+	/* flash all leads 2 times.*/
+	if ( cnt < 4) {
+		cnt++;
+		if (state == OFF){
+			all_leds_on();
+			state = ON;
+		}else{
+			all_leds_off();
+			state = OFF;
+		}
+	}
+
+	if (cnt >= 4 )
+		cnt = 0;
+
+	if (global_state == LEDS_ALLFLASH || global_state == LEDS_RESET)
+		uloop_timeout_set(&allflash_timer, ALLFLASH_TIMEOUT);
+	else{
+	    cnt = 0;
+	    state = OFF;
+    }
 }
 
 #define TEST_TIMEOUT 250
@@ -464,9 +496,16 @@ static int leds_set_method(struct ubus_context *ubus_ctx, struct ubus_object *ob
 			all_leds_off();
 			uloop_timeout_set(&test_inform_timer, TEST_TIMEOUT);
 		}
+
+		if (global_state == LEDS_ALLFLASH || global_state == LEDS_RESET) {
+			all_leds_off();
+			uloop_timeout_set(&allflash_timer, ALLFLASH_TIMEOUT);
+		}
+
 		if (global_state == LEDS_ALLON) {
 			all_leds_on();
 		}
+
 		if (global_state == LEDS_ALLOFF) {
 			all_leds_off();
 		}
