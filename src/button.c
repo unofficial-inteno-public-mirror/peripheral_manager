@@ -22,7 +22,7 @@ static void reread_config( void );
 
 static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed)
 {
-	char s[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN];
+	char s[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN+1];
 	s[0]=0;
 	strcat(s, UBUS_BUTTON_NAME_PREPEND);
 	strcat(s, button);
@@ -224,6 +224,7 @@ static int button_hotplug_cmd(const char *name, bool longpress)
 			return 0;
 		}
 	}
+	DBG(1,"unknown button: \"%s\"", name);
 	return 1;
 }
 
@@ -358,7 +359,6 @@ static int button_state_method(struct ubus_context *ubus_ctx, struct ubus_object
 {
 //	button_state_t state = read_button_state(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN);
 	blob_buf_init(&bblob, 0);
-
 	switch(read_button_state(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN)) {
 	case BUTTON_RELEASED:
 		blobmsg_add_string(&bblob, "state", "released");
@@ -377,8 +377,11 @@ static int button_state_method(struct ubus_context *ubus_ctx, struct ubus_object
 static int button_press_method(struct ubus_context *ubus_ctx, struct ubus_object *obj,
 				struct ubus_request_data *req, const char *method, struct blob_attr *msg)
 {
-	button_hotplug_cmd(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN, 0);
 	blob_buf_init(&bblob, 0);
+	if(button_hotplug_cmd(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN, 0))
+		blobmsg_add_string(&bblob, "return", "error");
+	else
+		blobmsg_add_string(&bblob, "return", "ok");
 	ubus_send_reply(ubus_ctx, req, bblob.head);
 	return 0;
 }
@@ -387,8 +390,11 @@ static int button_press_method(struct ubus_context *ubus_ctx, struct ubus_object
 static int button_press_long_method(struct ubus_context *ubus_ctx, struct ubus_object *obj,
 			       struct ubus_request_data *req, const char *method, struct blob_attr *msg)
 {
-	button_hotplug_cmd(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN, 1);
 	blob_buf_init(&bblob, 0);
+	if(button_hotplug_cmd(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN, 1))
+		blobmsg_add_string(&bblob, "return", "error");
+	else
+		blobmsg_add_string(&bblob, "return", "ok");
 	ubus_send_reply(ubus_ctx, req, bblob.head);
 	return 0;
 }
@@ -571,7 +577,7 @@ void button_init( struct server_ctx *s_ctx)
                 {
                         struct ubus_object *ubo;
                         int r;
-                        char name[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN];
+                        char name[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN+1];
 
                         /* register buttons object with ubus */
                         if((r = ubus_add_object(s_ctx->ubus_ctx, &buttons_object)))
@@ -580,7 +586,7 @@ void button_init( struct server_ctx *s_ctx)
                         ubo = malloc(sizeof(struct ubus_object));
                         memset(ubo, 0, sizeof(struct ubus_object));
 
-                        snprintf(name, UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN, "%s%s",
+                        snprintf(name, UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN+1, "%s%s",
                                  UBUS_BUTTON_NAME_PREPEND,
                                  function->name);
                         ubo->name      = strdup(name);
