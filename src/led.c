@@ -406,8 +406,6 @@ static int enable_function_led(const char* fn_name, int enable) {
 		return -1;
 	}
 
-	/* store timeout as number of passes on the flash loop */
-	/* in the loop decrement the timeout */
 	leds[led_idx].enable = enable;
 
 	return 0;
@@ -458,15 +456,14 @@ static int led_set_method(struct ubus_context *ubus_ctx, struct ubus_object *obj
 		number = blobmsg_get_u32(tb[LED_TIMEOUT]);
 		DBG(1,"set timeout [%s]->[%x]", fn_name, number);
 		timeout_function_led(fn_name, number);
-	}
+	}else // remove timeout
+		 timeout_function_led(fn_name, 0);
 
 	if (tb[LED_ENABLE]) {
 		number = blobmsg_get_u32(tb[LED_ENABLE]);
 		DBG(1,"set enable [%s]->[%x]", fn_name, number);
 		enable_function_led(fn_name, number);
-	} else // remove timeout
-		 timeout_function_led(fn_name, 0);
-
+	} 
 	return 0;
 }
 
