@@ -12,6 +12,8 @@
 #include "i2c.h"
 #include "gpio.h"
 
+#define SX9512_I2C_READ_BLOCK_SIZE  I2C_SMBUS_BLOCK_MAX
+#define SX9512_I2C_WRITE_BLOCK_SIZE 31
 
 #define X(name, reserved, default) { #name, reserved, default },
 const struct sx9512_reg_data sx9512_reg_data[] = { SX9512_REGS };
@@ -26,7 +28,7 @@ const struct sx9512_reg_data sx9512_reg_data[] = { SX9512_REGS };
 //! @retval -1 error
 int sx9512_init(const char *dev, int addr, struct sx9512_reg_nvm *nvm)
 {
-	int fd, i;
+	int fd, i, j;
 	struct sx9512_reg_nvm nvm_read;
 	if(!addr)
 		addr=SX9512_I2C_ADDRESS;
@@ -51,7 +53,11 @@ int sx9512_init(const char *dev, int addr, struct sx9512_reg_nvm *nvm)
 			if(sx9512_reg_reserved(i+SX9512_REG_NVM_AREA_START))
 				continue;
 			if(((uint8_t *)nvm)[i] != ((uint8_t *)&nvm_read)[i]) {
-				fprintf(stderr, "sx9512_init: register mismatch, setting default values and burning to NVM\n");
+				fprintf(stderr, "sx9512_init: register mismatch at 0x%02X (%02X:%02X), setting default values and burning to NVM\n", i+SX9512_REG_NVM_AREA_START, ((uint8_t *)nvm)[i], ((uint8_t *)&nvm_read)[i]);
+				//print NVM memory space
+				/*fprintf(stderr, "Addr want:got\n");
+				for(j=0;(unsigned int)j<sizeof(struct sx9512_reg_nvm);j++)
+					fprintf(stderr, "0x%02X %02X:%02X\n", j+SX9512_REG_NVM_AREA_START, ((uint8_t *)nvm)[j], ((uint8_t *)&nvm_read)[j]);*/
 				if(sx9512_reg_nvm_write(fd, nvm)) {
 					close(fd);
 					return -1;
@@ -226,10 +232,10 @@ int sx9512_reg_nvm_read(int fd, struct sx9512_reg_nvm *p)
 {
 	int r, s, i, rl;
 	s=sizeof(struct sx9512_reg_nvm);
-	for(i=0; i<s; i+=32) {
+	for(i=0; i<s; i+=SX9512_I2C_READ_BLOCK_SIZE) {
 		rl=s-i;
-		if(rl>32)
-			rl=32;
+		if(rl>SX9512_I2C_READ_BLOCK_SIZE)
+			rl=SX9512_I2C_READ_BLOCK_SIZE;
 		if((r=i2c_smbus_read_i2c_block_data(fd, SX9512_REG_NVM_AREA_START+i, rl, (uint8_t *)p+i))<0)
 			return -1;
 	}
@@ -244,10 +250,10 @@ int sx9512_reg_nvm_write(int fd, struct sx9512_reg_nvm *p)
 {
 	int r, s, i, rl;
 	s=sizeof(struct sx9512_reg_nvm);
-	for(i=0; i<s; i+=32) {
+	for(i=0; i<s; i+=SX9512_I2C_WRITE_BLOCK_SIZE) {
 		rl=s-i;
-		if(rl>32)
-			rl=32;
+		if(rl>SX9512_I2C_WRITE_BLOCK_SIZE)
+			rl=SX9512_I2C_WRITE_BLOCK_SIZE;
 		if((r=i2c_smbus_write_i2c_block_data(fd, SX9512_REG_NVM_AREA_START+i, rl, (uint8_t *)p+i))<0)
 			return -1;
 	}
