@@ -127,7 +127,7 @@ static int sx9512_led_set_state(struct led_drv *drv, led_state_t state)
 	}
 
 	if (state == p->state ) {
-		DBG(3,"skipping set");
+		DBG(4,"skipping set");
 		return state;
 	}
 
@@ -222,18 +222,63 @@ void sx9512_check(void)
   return -1 = error
 */
 
+/* driver needs to record the near and far events so it can filter other buttons */
+/* driver should only report press if proximity_near_active */
+static int proximity_near_active;
+static int proximity_far_active;
+
 static button_state_t sx9512_button_get_state(struct button_drv *drv)
 {
 	struct button_data *p = (struct button_data *)drv->priv;
-	int bit = 1 << p->addr;
+	int bit;
 
 	if (!i2c_touch_current.dev)
 		return -1;
 
+	/* proximity NEAR record state */
+	bit = 1<<7;
+	if( i2c_touch_current.shadow_irq & SX9512_IRQ_NEAR ) {
+		i2c_touch_current.shadow_irq &=  ~SX9512_IRQ_NEAR;
+		if ( bit & i2c_touch_current.shadow_proximity ) {
+			i2c_touch_current.shadow_proximity = i2c_touch_current.shadow_proximity & ~bit;
+			proximity_near_active = 1;
+			DBG(3,"Near active");
+		}
+	}
+
+	/* proximity NEAR report button if asked */
+	if (p->addr == 8 ) {
+		bit = 1<<7;
+		if( proximity_near_active ) {
+			return p->state = BUTTON_PRESSED;
+		}
+		return BUTTON_RELEASED;
+	}
+
+	/* proximity FAR record state */
+	if( i2c_touch_current.shadow_irq & SX9512_IRQ_FAR ) {
+		i2c_touch_current.shadow_irq &=  ~SX9512_IRQ_FAR;
+		proximity_near_active = 0;
+		DBG(3,"Far active");
+		proximity_far_active = 1;
+	}
+
+	/* proximity FAR report buttion if asked */
+	if (p->addr == 9) {
+		if( proximity_far_active ) {
+			proximity_far_active = 0;   /* far is just a trigger event it can't be pressed for a duration */
+			return p->state = BUTTON_PRESSED;
+		}
+		return BUTTON_RELEASED;
+	}
+
+	/* normal button */
 	if (p->addr < 8) {
+		bit = 1 << p->addr;
 		if ( bit & i2c_touch_current.shadow_touch ) {
 			i2c_touch_current.shadow_touch = i2c_touch_current.shadow_touch & ~bit;
-			return p->state = BUTTON_PRESSED;
+			if (proximity_near_active)
+				return p->state = BUTTON_PRESSED;
 		}
 
 		/* if the button was already pressed and we don't have a release irq report it as still pressed */
@@ -243,30 +288,10 @@ static button_state_t sx9512_button_get_state(struct button_drv *drv)
 			}
 		}
 		return p->state = BUTTON_RELEASED;
-
-		/* proximity NEAR */
-	}else if (p->addr == 8 ) {
-		bit = 1<<7;
-		if( i2c_touch_current.shadow_irq & SX9512_IRQ_NEAR ) {
-			i2c_touch_current.shadow_irq &=  ~SX9512_IRQ_NEAR;
-			if ( bit & i2c_touch_current.shadow_proximity ) {
-				i2c_touch_current.shadow_proximity = i2c_touch_current.shadow_proximity & ~bit;
-				return p->state = BUTTON_PRESSED;
-			}
-		}
-		return BUTTON_RELEASED;
-
-		/* proximity FAR */
-	}else if (p->addr == 9) {
-		if( i2c_touch_current.shadow_irq & SX9512_IRQ_FAR ) {
-			i2c_touch_current.shadow_irq &=  ~SX9512_IRQ_FAR;
-			return p->state = BUTTON_PRESSED;
-		}
-		return BUTTON_RELEASED;
-	}else {
-		DBG(1,"Button address out of range %d\n",p->addr);
-		return BUTTON_RELEASED;
 	}
+
+	DBG(1,"Button address out of range %d\n",p->addr);
+	return BUTTON_RELEASED;
 }
 
 static struct button_drv_func button_func = {

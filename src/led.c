@@ -327,7 +327,7 @@ static void super_update(void)
 					}
 					if (status){
 						leds[i].state = j;
-						DBG(3,"\tSet super function [%s] to action [%s]",leds[i].name, fn_actions[j]);
+						DBG(4,"\tSet super function [%s] to action [%s]",leds[i].name, fn_actions[j]);
 					}
 				}
 			}
