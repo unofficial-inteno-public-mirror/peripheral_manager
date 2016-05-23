@@ -64,6 +64,14 @@ static led_state_t sx9512_led_get_state(struct led_drv *drv);
 static int sx9512_set_state(struct led_data *p, led_state_t state);
 extern struct uloop_timeout i2c_touch_reset_timer;
 
+static int proximity_near_active;
+static int proximity_far_active;
+
+#define NEAR_TIMEOUT 1000*30
+static struct timespec near_active_time;
+static void near_timer_start(void);
+static void near_timer_stop(void);
+static int near_timeout(int mtimeout);
 
 /* sx9512 needs a reset every 30 minutes. to recalibrate the touch detection */
 #define I2C_RESET_TIME (1000 * 60 * 30) /* 30 min in ms */
@@ -80,6 +88,11 @@ static void sx9512_reset_handler(struct uloop_timeout *timeout)
 		struct sx9512_list *node = list_entry(i, struct sx9512_list, list);
 		sx9512_set_state(node->drv, node->drv->state);
 	}
+
+	/* Reset internal states */
+	near_timer_stop();
+	proximity_near_active = 0;
+	proximity_far_active = 0;
 
 	uloop_timeout_set(&i2c_touch_reset_timer, I2C_RESET_TIME);
 }
@@ -224,8 +237,37 @@ void sx9512_check(void)
 
 /* driver needs to record the near and far events so it can filter other buttons */
 /* driver should only report press if proximity_near_active */
-static int proximity_near_active;
-static int proximity_far_active;
+
+static void near_timer_start(void)
+{
+	if (near_active_time.tv_sec == 0 && near_active_time.tv_nsec == 0)
+		clock_gettime(CLOCK_MONOTONIC, &near_active_time);
+}
+
+static void near_timer_stop(void)
+{
+        near_active_time.tv_sec = 0;
+        near_active_time.tv_nsec = 0;
+}
+
+static int near_timeout(int mtimeout)
+{
+	struct timespec now;
+	int sec;
+	int nsec;
+	int time_elapsed;
+
+        if (proximity_near_active) {
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                sec =  now.tv_sec  - near_active_time.tv_sec;
+                nsec = now.tv_nsec - near_active_time.tv_nsec;
+		time_elapsed = sec*1000 + nsec/1000000;
+                if ( mtimeout < time_elapsed) {
+			return 1;
+                }
+        }
+	return 0;
+}
 
 static button_state_t sx9512_button_get_state(struct button_drv *drv)
 {
@@ -242,6 +284,7 @@ static button_state_t sx9512_button_get_state(struct button_drv *drv)
 		if ( bit & i2c_touch_current.shadow_proximity ) {
 			i2c_touch_current.shadow_proximity = i2c_touch_current.shadow_proximity & ~bit;
 			proximity_near_active = 1;
+			near_timer_start();
 			DBG(3,"Near active");
 		}
 	}
@@ -252,13 +295,14 @@ static button_state_t sx9512_button_get_state(struct button_drv *drv)
 		if( proximity_near_active ) {
 			return p->state = BUTTON_PRESSED;
 		}
-		return BUTTON_RELEASED;
+		return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_RELEASED;
 	}
 
 	/* proximity FAR record state */
 	if( i2c_touch_current.shadow_irq & SX9512_IRQ_FAR ) {
 		i2c_touch_current.shadow_irq &=  ~SX9512_IRQ_FAR;
 		proximity_near_active = 0;
+		near_timer_stop();
 		DBG(3,"Far active");
 		proximity_far_active = 1;
 	}
@@ -267,9 +311,10 @@ static button_state_t sx9512_button_get_state(struct button_drv *drv)
 	if (p->addr == 9) {
 		if( proximity_far_active ) {
 			proximity_far_active = 0;   /* far is just a trigger event it can't be pressed for a duration */
-			return p->state = BUTTON_PRESSED;
+			p->state = BUTTON_PRESSED;
+			return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_PRESSED;
 		}
-		return BUTTON_RELEASED;
+		return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_RELEASED;
 	}
 
 	/* normal button */
@@ -277,21 +322,24 @@ static button_state_t sx9512_button_get_state(struct button_drv *drv)
 		bit = 1 << p->addr;
 		if ( bit & i2c_touch_current.shadow_touch ) {
 			i2c_touch_current.shadow_touch = i2c_touch_current.shadow_touch & ~bit;
-			if (proximity_near_active)
-				return p->state = BUTTON_PRESSED;
+			if (proximity_near_active){
+				p->state = BUTTON_PRESSED;
+				return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_PRESSED;
+			}
 		}
 
 		/* if the button was already pressed and we don't have a release irq report it as still pressed */
 		if( p->state == BUTTON_PRESSED){
 			if (! (i2c_touch_current.shadow_irq & SX9512_IRQ_RELEASE) ) {
-				return BUTTON_PRESSED;
+				return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_PRESSED;
 			}
 		}
-		return p->state = BUTTON_RELEASED;
+		p->state = BUTTON_RELEASED;
+		return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR :BUTTON_RELEASED;
 	}
 
 	DBG(1,"Button address out of range %d\n",p->addr);
-	return BUTTON_RELEASED;
+	return near_timeout(NEAR_TIMEOUT) ? BUTTON_ERROR : BUTTON_RELEASED;
 }
 
 static struct button_drv_func button_func = {
@@ -377,6 +425,9 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 	int i, fd, sx9512_i2c_address, sx9512_irq_pin, sx9512_active_capsense_channels, sx9512_active_led_channels;
 	struct sx9512_reg_nvm nvm;
 	struct list_head *il;
+	struct ucilist *node;
+
+	LIST_HEAD(sx9512_init_regs);
 
 	if(!(sx9512_i2c_device = ucix_get_option(s_ctx->uci_ctx, "hw", "board", "sx9512_i2c_device"))) {
 		DBG(0, "Error: option is missing: sx9512_i2c_device");
@@ -428,8 +479,6 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 		}
 	}
 
-	LIST_HEAD(sx9512_init_regs);
-	struct ucilist *node;
 	ucix_get_option_list(s_ctx->uci_ctx, "hw","sx9512_init_regs", "regs", &sx9512_init_regs);
 	list_for_each_entry(node,&sx9512_init_regs,list) {
 		sx9512_reg_t reg;
@@ -463,8 +512,8 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 	sx9512_led_init(s_ctx);
 	/* Force set of initial state for leds. */
 	list_for_each(il, &sx9512_leds) {
-		struct sx9512_list *node = list_entry(il, struct sx9512_list, list);
-		sx9512_set_state(node->drv, node->drv->state);
+		struct sx9512_list *lnode = list_entry(il, struct sx9512_list, list);
+		sx9512_set_state(lnode->drv, lnode->drv->state);
 	}
 	/* start reset timer */
 	uloop_timeout_set(&i2c_touch_reset_timer, I2C_RESET_TIME);

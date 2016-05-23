@@ -346,7 +346,11 @@ static void button_handler(struct uloop_timeout *timeout)
                                         }
                                         timer_stop(drv_node);
                                 }
-//                                DBG(1, " %s state = %d", drv_node->drv->name,st);
+
+                                if (st == BUTTON_ERROR ) {
+                                        timer_stop(drv_node);
+                                        DBG(3, " %s state = BUTTON_ERROR", drv_node->drv->name);
+                                }
                         }
                 }
         }
