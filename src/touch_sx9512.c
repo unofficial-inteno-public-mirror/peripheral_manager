@@ -377,7 +377,7 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 	int i, fd, sx9512_i2c_address, sx9512_irq_pin, sx9512_active_capsense_channels, sx9512_active_led_channels;
 	struct sx9512_reg_nvm nvm;
 	struct list_head *il;
-	
+
 	if(!(sx9512_i2c_device = ucix_get_option(s_ctx->uci_ctx, "hw", "board", "sx9512_i2c_device"))) {
 		DBG(0, "Error: option is missing: sx9512_i2c_device");
 		return;
@@ -397,14 +397,14 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 	}
 	sx9512_irq_pin = strtol(s,0,0);
 	DBG(1, "sx9512_irq_pin = [%d]", sx9512_irq_pin);
-	
+
 	if(!(s=ucix_get_option(s_ctx->uci_ctx, "hw", "board", "sx9512_active_capsense_channels"))) {
 		DBG(0, "Error: option is missing: sx9512_active_capsense_channels");
 		return;
 	}
 	sx9512_active_capsense_channels = strtol(s,0,16);
 	DBG(1, "sx9512_active_capsense_channels = [%02X]", sx9512_active_capsense_channels);
-	
+
 	if(!(s=ucix_get_option(s_ctx->uci_ctx, "hw", "board", "sx9512_active_led_channels"))) {
 		DBG(0, "Error: option is missing: sx9512_active_led_channels");
 		return;
