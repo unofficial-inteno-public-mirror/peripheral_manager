@@ -220,7 +220,7 @@ static void set_led(state_t lstate)
 	ret = ubus_invoke(ubus_ctx, id, "set", b.head, NULL, 0, 3000);
 
         if ( ret )
-                DBG(1,"catv_moitor: set led failed [%s]", ubus_strerror(ret));
+                DBG(1,"catv_monitor: set led failed [%s]", ubus_strerror(ret));
 }
 
 void catv_monitor_init(struct server_ctx *s_ctx)
