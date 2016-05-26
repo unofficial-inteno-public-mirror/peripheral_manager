@@ -382,6 +382,9 @@ static int button_press_method(struct ubus_context *ubus_ctx, struct ubus_object
 				struct ubus_request_data *req, const char *method, struct blob_attr *msg)
 {
 	blob_buf_init(&bblob, 0);
+
+        syslog(LOG_WARNING, "button_press_method on %s", obj->name);
+
 	if(button_hotplug_cmd(obj->name+UBUS_BUTTON_NAME_PREPEND_LEN, 0))
 		blobmsg_add_string(&bblob, "return", "error");
 	else
