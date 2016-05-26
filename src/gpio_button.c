@@ -11,7 +11,6 @@ void gpio_button_init(struct server_ctx *s_ctx);
 struct gpio_button_data {
 	int addr;
 	int active;
-	int state;
 	struct button_drv button;
 };
 
@@ -24,11 +23,9 @@ static button_state_t gpio_button_get_state(struct button_drv *drv)
 	value = board_ioctl( BOARD_IOCTL_GET_GPIO, 0, 0, NULL, p->addr, 0);
 
 	if(p->active)
-		p->state = !!value;
+		return !!value;
 	else
-		p->state = !value;
-
-	return p->state;
+		return !value;
 }
 
 static struct button_drv_func func = {
