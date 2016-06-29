@@ -14,6 +14,7 @@ peripheral_manager_SOURCES = \
 	src/led.c \
 	src/led.h \
 	src/sim_led.c \
+	src/wlctl_led.c \
 	src/button.h \
 	src/button.c \
 	src/sim_button.c \
