@@ -1389,8 +1389,8 @@ struct catv_handler * catv_init(struct uci_context *uci_ctx, const char *i2c_bus
         return NULL;
     }
 
-    /* only run on EG300 hardware */
-    if ( strcasecmp("EG300", p)){
+    /* only run on EG300/EG400 hardware */
+    if (strcasecmp("EG300", p) && strcasecmp("EG400", p)) {
         free(h);
         return NULL;
     }
