@@ -42,6 +42,11 @@ const struct i2c_sfp i2c_sfp_list[] = {
           .ddm_addr = 0x51,
           .name = "EG300"
         },
+        { .bus = "/dev/i2c-1",
+          .rom_addr = 0x50,
+          .ddm_addr = 0x51,
+          .name = "EG400"
+        },
 };
 
 const struct i2c_sfp *i2c_sfp;
