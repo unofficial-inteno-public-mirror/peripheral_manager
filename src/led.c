@@ -352,9 +352,18 @@ static int set_function_led(const char* fn_name, const char* action) {
 
 	leds[led_idx].state = act_idx;
 
+
+	/* update all LED driver states */
 	list_for_each_entry(led, &leds[led_idx].actions[act_idx].led_list, list) {
 		if (led->drv){
-			led->drv->func->set_state(led->drv, led->state);
+			if (led->drv->func->support) {
+				if (led->drv->func->support(led->drv, led->state)) {
+					led->drv->func->set_state(led->drv, led->state);
+				}
+			}else{
+				/* driver don't have suport function assume it handle everything */
+				led->drv->func->set_state(led->drv, led->state);
+			}
 		}
 	}
 
