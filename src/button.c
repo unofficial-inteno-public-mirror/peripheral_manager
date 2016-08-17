@@ -1,6 +1,7 @@
 /*-*- Mode: C; c-basic-offset: 8; indent-tabs-mode: nil -*-*/
 #include "config.h"
 #include <syslog.h>
+#include <sys/time.h>
 #include <time.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -10,6 +11,7 @@
 #include "touch_sx9512.h"
 #include "prox_px3220.h"
 
+static time_t starttime_t;
 
 static struct ubus_context *global_ubus_ctx;
 static struct blob_buf bblob;
@@ -337,10 +339,16 @@ static void button_handler(struct uloop_timeout *timeout)
 								led_dimming();
 
                                                         if (node->enable) {
+                                                                struct timeval tv;
                                                                 button_ubus_interface_event(global_ubus_ctx,
                                                                                             node->name,
                                                                                             BUTTON_RELEASED);
-                                                                button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+                                                                /* filter out button presses that are triggered less the 4 seconds since start */
+                                                                gettimeofday(&tv, NULL);
+                                                                if (tv.tv_sec > starttime_t + 4)
+                                                                   button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+                                                                else
+                                                                   syslog(LOG_WARNING, "button %s press ignored", drv_node->drv->name);
                                                         }
 						}
                                         }
@@ -458,6 +466,9 @@ void button_init( struct server_ctx *s_ctx)
         const char *s;
 	int default_minpress = 100;
         struct stat stat_buf;
+
+        /* store the start time locally */
+        starttime_t = s_ctx->starttime;
 
 	LIST_HEAD(buttonnames);
 

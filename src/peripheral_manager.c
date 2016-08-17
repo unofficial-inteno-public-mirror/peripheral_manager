@@ -8,6 +8,8 @@
 #include <syslog.h>
 #include <config.h>
 #include <getopt.h>
+#include <time.h>
+#include <sys/time.h>
 #include "log.h"
 #include "ucix.h"
 

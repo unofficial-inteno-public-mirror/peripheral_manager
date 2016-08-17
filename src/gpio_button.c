@@ -38,10 +38,13 @@ void gpio_button_init(struct server_ctx *s_ctx) {
 
 	DBG(1, "");
 
+	gpio_init();
+
 	ucix_get_option_list(s_ctx->uci_ctx, "hw" ,"gpio_buttons", "buttons", &buttons);
 	list_for_each_entry(node, &buttons, list) {
 		struct gpio_button_data *data;
 		const char *s;
+		int tmp;
 
 		DBG(1, "value = [%s]",node->val);
 
@@ -52,9 +55,16 @@ void gpio_button_init(struct server_ctx *s_ctx) {
 
 		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->button.name, "addr");
 		DBG(1, "addr = [%s]", s);
+
 		if (s){
 			data->addr =  strtol(s,0,0);
 		}
+
+		/* Query gpio to setup port and supress possible ghost presses
+		 * Workaround for some issue in the broadcom gpio driver */
+		gpio_get_state(data->addr);
+		gpio_get_state(data->addr);
+		gpio_get_state(data->addr);
 
 		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->button.name, "active");
 		data->active = -1;
@@ -72,6 +82,4 @@ void gpio_button_init(struct server_ctx *s_ctx) {
 
 		button_add(&data->button);
 	}
-
-	gpio_init();
 }
