@@ -19,10 +19,9 @@ static struct blob_buf bblob;
 static char *config_file;       /* path+name of the buttons config file */
 static time_t config_mtime_sec; /* mtime of config file */
 
-static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed);
 static void reread_config( void );
 
-static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed)
+static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *button, button_state_t pressed, bool longpress)
 {
 	char s[UBUS_BUTTON_NAME_PREPEND_LEN+BUTTON_MAX_NAME_LEN+1];
 	s[0]=0;
@@ -30,6 +29,7 @@ static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *but
 	strcat(s, button);
 	blob_buf_init(&bblob, 0);
 	blobmsg_add_string(&bblob, "action", pressed ? "pressed" : "released");
+	blobmsg_add_string(&bblob, "type", longpress ? "long" : "short");
 	ubus_send_event(ubus_ctx, s, bblob.head);
 }
 
@@ -340,13 +340,15 @@ static void button_handler(struct uloop_timeout *timeout)
 
                                                         if (node->enable) {
                                                                 struct timeval tv;
-                                                                button_ubus_interface_event(global_ubus_ctx,
-                                                                                            node->name,
-                                                                                            BUTTON_RELEASED);
                                                                 /* filter out button presses that are triggered less the 4 seconds since start */
                                                                 gettimeofday(&tv, NULL);
-                                                                if (tv.tv_sec > starttime_t + 4)
+                                                                if (tv.tv_sec > starttime_t + 4) {
+                                                                   button_ubus_interface_event(global_ubus_ctx,
+                                                                                            node->name,
+                                                                                            BUTTON_RELEASED,
+                                                                                            r==BUTTON_PRESS_LONG);
                                                                    button_hotplug_cmd(node->name, r==BUTTON_PRESS_LONG);
+                                                                }
                                                                 else
                                                                    syslog(LOG_WARNING, "button %s press ignored", drv_node->drv->name);
                                                         }
