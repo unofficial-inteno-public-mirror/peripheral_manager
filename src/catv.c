@@ -977,10 +977,6 @@ static void catv_filter(struct catv_handler *h,int num)
     ret = i2c_smbus_read_i2c_block_data(h->i2c_a0, 33, 20, (__u8*)vpn);
 
     if ( ret >= 0 ) {
-            /* bail out if MODEL_302 */
-            if (strncmp(vpn, vendor_part[MODEL_302], strlen(vendor_part[MODEL_302]) ) == 0)
-                    return;
-
             /* set filter */
             status = i2c_smbus_read_byte_data(h->i2c_a2,73);
             status = status &  ~(0x10 | 0x20 | 0x40);
