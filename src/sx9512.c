@@ -3,7 +3,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <error.h>
+#include <syslog.h>
+//#include <error.h>
 #include <errno.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -186,7 +187,8 @@ int sx9512_read_status_cached(int fd, struct sx9512_touch_state *touch_state)
 	touch_state->touched=0;
 	touch_state->released=0;
 	if(sx9512_read_status(fd, &status))
-		error(-1, errno, "I2C read error");
+		syslog(LOG_ERR,"%d: I2C read error\n",errno);
+
 	touch_state->state=status.touch_status | !!((*(uint8_t *)&status.prox_status) & 0xc0);
 	if(*(uint8_t *)&status.irq_src) {
 		if(status.irq_src.touch || status.irq_src.prox_near)

@@ -3,7 +3,10 @@
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <board.h>
+
+#ifdef HAVE_BOARD_H
+	#include <board.h>
+#endif
 
 typedef int gpio_t;
 

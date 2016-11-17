@@ -25,6 +25,10 @@ peripheral_manager_SOURCES = \
 	src/smbus.h \
 	src/i2c.c \
 	src/i2c.h \
+	src/touch_sx9512.c \
+	src/touch_sx9512.h \
+	src/sx9512.c \
+	src/sx9512.h \
 	src/sfp.c \
 	src/sfp.h
 
@@ -41,10 +45,6 @@ peripheral_manager_SOURCES += \
 	src/gpio.h \
 	src/gpio_shift_register.c \
 	src/gpio_shift_register.h \
-	src/touch_sx9512.c \
-	src/touch_sx9512.h \
-	src/sx9512.c \
-	src/sx9512.h \
 	src/vox.h \
 	src/vox.c \
 	src/prox_px3220.c

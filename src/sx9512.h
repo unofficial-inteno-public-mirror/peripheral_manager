@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#if !defined(__BYTE_ORDER)
+	#include <endian.h>
+#endif
+
 #if __BYTE_ORDER == __BIG_ENDIAN
 #define BIT_ORDER_BIG_ENDIAN
 #endif

@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-#include <board.h>
 #include "button.h"
 #include "led.h"
 #include "log.h"
@@ -19,7 +18,11 @@
 #include "i2c.h"
 
 #include "touch_sx9512.h"
-#include "gpio.h"
+
+#ifdef HAVE_BOARD_H
+	#include <board.h>
+	#include "gpio.h"
+#endif
 
 #define SX9512_IRQ_RESET		1<<7
 #define SX9512_IRQ_TOUCH		1<<6
@@ -143,7 +146,6 @@ static int sx9512_led_set_state(struct led_drv *drv, led_state_t state)
 		DBG(4,"skipping set");
 		return state;
 	}
-
 	return sx9512_set_state(p, state);
 }
 
@@ -176,8 +178,10 @@ void sx9512_check(void)
 		return;
 
 	if (i2c_touch_current.irq_button) {
-		int button;
+		int button=1;
+#ifdef HAVE_BOARD_H
 		button = board_ioctl( BOARD_IOCTL_GET_GPIO, 0, 0, NULL, i2c_touch_current.irq_button, 0);
+#endif
 		if (button == 0)
 			got_irq = 1;
 	}
