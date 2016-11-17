@@ -4,7 +4,6 @@
 #include "log.h"
 #include "server.h"
 #include "gpio.h"
-#include <board.h>
 
 void gpio_button_init(struct server_ctx *s_ctx);
 

@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <board.h>
 #include "led.h"
 #include "log.h"
 #include "server.h"
@@ -26,6 +25,7 @@ typedef enum {
 	DIRECT,
 	SHIFTREG_BRCM,
 	SHIFTREG_GPIO,
+	GPIO_LINUX,
 } gpio_mode_t;
 
 struct gpio_led_data {
@@ -54,6 +54,9 @@ static int gpio_led_set_state(struct led_drv *drv, led_state_t state)
 	switch (p->mode) {
 	case DIRECT:
 		board_ioctl( BOARD_IOCTL_SET_GPIO, 0, 0, NULL, p->addr, bit_val);
+		break;
+	case GPIO_LINUX:
+		gpio_linux_set(p->addr, bit_val);
 		break;
 	case SHIFTREG_BRCM:
 		board_ioctl( BOARD_IOCTL_LED_CTRL, 0, 0, NULL, p->addr, bit_val);
@@ -125,11 +128,13 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 		DBG(1, "mode = [%s]", s);
 		if (s) {
 
-			if (!strncasecmp("direct",s,3))
+			if (!strncasecmp("direct",s,6))
 				data->mode =  DIRECT;
-			else if (!strncasecmp("sr",s,5))
+			else if (!strncasecmp("linux",s,5))
+				data->mode =  GPIO_LINUX;
+			else if (!strncasecmp("sr",s,2))
 				data->mode =  SHIFTREG_BRCM;
-			else if (!strncasecmp("csr",s,4))
+			else if (!strncasecmp("csr",s,3))
 				data->mode =  SHIFTREG_GPIO;
 			else
 				DBG(1, "Mode %s : Not supported!", s);
@@ -139,13 +144,14 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 		DBG(1, "active = [%s]", s);
 		if (s) {
 			data->active = UNKNOWN;
-			if (!strncasecmp("hi",s,3))
+			if (!strncasecmp("hi",s,1))
 				data->active = HI;
 			if (!strncasecmp("low",s,3))
 				data->active = LOW;
 		}
 		data->led.func = &func;
 		data->led.priv = data;
+		gpio_linux_output_init(data->addr);
 		led_add(&data->led);
 	}
 	gpio_init();

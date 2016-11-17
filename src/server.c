@@ -45,9 +45,6 @@ void server_start(struct uci_context *uci_ctx, struct ubus_context *ubus_ctx, co
 	sim_button_init(&server);
 
 #ifdef HAVE_BOARD_H
-	gpio_led_init(&server);
-	gpio_button_init(&server);
-
 
 	px3220_init(&server);
 
@@ -55,6 +52,9 @@ void server_start(struct uci_context *uci_ctx, struct ubus_context *ubus_ctx, co
 
 	wlctl_led_init(&server);
 #endif
+	gpio_led_init(&server);
+	gpio_button_init(&server);
+
 	sx9512_handler_init(&server);
 
 	DBG(1, "connect generic buttons/leds to hardware drivers.");

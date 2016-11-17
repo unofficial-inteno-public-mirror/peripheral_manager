@@ -29,6 +29,11 @@ peripheral_manager_SOURCES = \
 	src/touch_sx9512.h \
 	src/sx9512.c \
 	src/sx9512.h \
+	src/gpio_linux.c \
+	src/gpio_led.c \
+	src/gpio_led.h \
+	src/gpio_button.c \
+	src/gpio_button.h \
 	src/sfp.c \
 	src/sfp.h
 
@@ -37,10 +42,6 @@ if BRCM_BOARD
 bin_PROGRAMS += vox_test gpio_test eco_bug
 
 peripheral_manager_SOURCES += \
-	src/gpio_led.c \
-	src/gpio_led.h \
-	src/gpio_button.c \
-	src/gpio_button.h \
 	src/gpio.c \
 	src/gpio.h \
 	src/gpio_shift_register.c \
