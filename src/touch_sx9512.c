@@ -18,10 +18,10 @@
 #include "i2c.h"
 
 #include "touch_sx9512.h"
+#include "gpio.h"
 
 #ifdef HAVE_BOARD_H
 	#include <board.h>
-	#include "gpio.h"
 #endif
 
 #define SX9512_IRQ_RESET		1<<7
@@ -181,10 +181,13 @@ void sx9512_check(void)
 		int button=1;
 #ifdef HAVE_BOARD_H
 		button = board_ioctl( BOARD_IOCTL_GET_GPIO, 0, 0, NULL, i2c_touch_current.irq_button, 0);
+#else
+		button = gpio_linux_get(i2c_touch_current.irq_button);
 #endif
 		if (button == 0)
 			got_irq = 1;
 	}
+
 	if ( got_irq ) {
 
 		ret = i2c_smbus_read_byte_data(i2c_touch_current.dev, SX9512_REG_IRQ_SRC);
@@ -511,7 +514,9 @@ void sx9512_handler_init(struct server_ctx *s_ctx)
 	i2c_touch_current.dev=fd;
 	i2c_touch_current.addr=sx9512_i2c_address;
 	i2c_touch_current.irq_button=sx9512_irq_pin;
-
+#ifndef HAVE_BOARD_H
+	gpio_linux_input_init(sx9512_irq_pin);
+#endif
 	sx9512_button_init(s_ctx);
 	sx9512_led_init(s_ctx);
 	/* Force set of initial state for leds. */
