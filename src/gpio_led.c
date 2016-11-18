@@ -105,7 +105,7 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 	if((s=ucix_get_option(s_ctx->uci_ctx, "hw", "board", "gpio_shiftreg_bits")))
 		gpio_shiftreg_bits = strtol(s,0,0);
 	DBG(1, "gpio_shiftreg_bits = [%d]", gpio_shiftreg_bits);
-	
+
 	ucix_get_option_list(s_ctx->uci_ctx, "hw" ,"gpio_leds", "leds", &leds);
 	list_for_each_entry(node,&leds,list){
 		struct gpio_led_data *data;

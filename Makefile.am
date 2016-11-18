@@ -29,6 +29,7 @@ peripheral_manager_SOURCES = \
 	src/touch_sx9512.h \
 	src/sx9512.c \
 	src/sx9512.h \
+	src/gpio.h \
 	src/gpio_linux.c \
 	src/gpio_led.c \
 	src/gpio_led.h \
@@ -43,7 +44,6 @@ bin_PROGRAMS += vox_test gpio_test eco_bug
 
 peripheral_manager_SOURCES += \
 	src/gpio.c \
-	src/gpio.h \
 	src/gpio_shift_register.c \
 	src/gpio_shift_register.h \
 	src/vox.h \

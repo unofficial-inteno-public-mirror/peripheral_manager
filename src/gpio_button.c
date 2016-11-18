@@ -7,8 +7,17 @@
 
 void gpio_button_init(struct server_ctx *s_ctx);
 
+typedef enum {
+	MODE_UNKNOWN,
+	DIRECT,
+	SHIFTREG_BRCM,
+	SHIFTREG_GPIO,
+	GPIO_LINUX,
+} gpio_mode_t;
+
 struct gpio_button_data {
 	int addr;
+	gpio_mode_t mode;
 	int active;
 	struct button_drv button;
 };
@@ -19,8 +28,11 @@ static button_state_t gpio_button_get_state(struct button_drv *drv)
 	struct gpio_button_data *p = (struct gpio_button_data *)drv->priv;
 	int value;
 
+#ifdef HAVE_BOARD_H
 	value = board_ioctl( BOARD_IOCTL_GET_GPIO, 0, 0, NULL, p->addr, 0);
-
+#else
+	value = gpio_linux_get(p->addr);
+#endif
 	if(p->active)
 		return !!value;
 	else
@@ -52,12 +64,30 @@ void gpio_button_init(struct server_ctx *s_ctx) {
 
 		data->button.name = node->val;
 
+		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->button.name, "mode");
+		DBG(1, "mode = [%s]", s);
+		if (s) {
+
+			if (!strncasecmp("direct",s,6))
+				data->mode =  DIRECT;
+			else if (!strncasecmp("linux",s,5))
+				data->mode =  GPIO_LINUX;
+			else if (!strncasecmp("sr",s,2))
+				data->mode =  SHIFTREG_BRCM;
+			else if (!strncasecmp("csr",s,3))
+				data->mode =  SHIFTREG_GPIO;
+			else
+				DBG(1, "Mode %s : Not supported!", s);
+		}
+
 		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->button.name, "addr");
 		DBG(1, "addr = [%s]", s);
 
 		if (s){
 			data->addr =  strtol(s,0,0);
 		}
+
+		gpio_linux_input_init(data->addr);
 
 		/* Query gpio to setup port and supress possible ghost presses
 		 * Workaround for some issue in the broadcom gpio driver */

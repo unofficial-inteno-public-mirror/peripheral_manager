@@ -17,7 +17,7 @@ int board_ioctl(int ioctl_id, int action, int hex, char* string_buf, int string_
 	return 0;
 }
 
-void gpio_linux_output_init(int addr){
+static void gpio_linux_dir_init(int addr, int dir ){
 	char buf[100];
 	int fd;
 
@@ -30,9 +30,21 @@ void gpio_linux_output_init(int addr){
 	/* set gpio as output */
 	sprintf(buf, "/sys/class/gpio/gpio%d/direction",addr);
 	fd = open(buf, O_WRONLY);
-	sprintf(buf, "out\n");
+	if (dir)
+		sprintf(buf, "in\n");
+	else
+		sprintf(buf, "out\n");
 	write(fd, buf, strlen(buf));
 	close(fd);
+}
+
+
+void gpio_linux_output_init(int addr){
+	gpio_linux_dir_init(addr, 0);
+}
+
+void gpio_linux_input_init(int addr){
+	gpio_linux_dir_init(addr, 1);
 }
 
 int gpio_linux_set(int addr, int val)
@@ -48,6 +60,24 @@ int gpio_linux_set(int addr, int val)
 	write(fd, buf, strlen(buf));
 	close(fd);
 
+	return 0;
+}
+
+int gpio_linux_get(int addr)
+{
+	char buf[100];
+	int fd;
+	int size;
+
+	sprintf(buf, "/sys/class/gpio/gpio%d/value", addr);
+	fd = open(buf, O_RDONLY);
+
+	size = read(fd, buf, 100);
+	close(fd);
+
+	if(size){
+		return strtol(buf, 0, 0);
+	}
 	return 0;
 }
 

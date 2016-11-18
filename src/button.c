@@ -105,10 +105,12 @@ static struct function_button *get_button(const char *name)
 static button_state_t read_button_state(const char *name)
 {
 	struct list_head *i;
-#ifdef HAVE_BOARD_H
+
 	/* sx9512 driver needs to read out all buttons at once */
 	/* so call it once at beginning of scanning inputs  */
 	sx9512_check();
+
+#ifdef HAVE_BOARD_H
 	/* same for px3220 */
 	px3220_check();
 #endif
@@ -149,10 +151,10 @@ static struct button_status_all * read_button_states(void)
 	static struct button_status_all p;
 	struct list_head *i;
         p.n=0;
-#ifdef HAVE_BOARD_H
 	/* sx9512 driver needs to read out all buttons at once */
 	/* so call it once at beginning of scanning inputs  */
 	sx9512_check();
+#ifdef HAVE_BOARD_H
 	/* same for px3220 */
 	px3220_check();
 #endif
@@ -283,11 +285,11 @@ static void button_handler(struct uloop_timeout *timeout)
         struct stat stat_buf;
 //        DBG(1, "");
 
-#ifdef HAVE_BOARD_H
-
         /* sx9512 driver needs to read out all buttons at once */
         /* so call it once at beginning of scanning inputs  */
         sx9512_check();
+
+#ifdef HAVE_BOARD_H
         /* same for px3220 */
         px3220_check();
 #endif

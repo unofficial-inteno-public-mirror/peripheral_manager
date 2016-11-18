@@ -7,7 +7,9 @@
 #ifdef HAVE_BOARD_H
 	#include <board.h>
 	#define gpio_linux_set(...)
+	#define gpio_linux_get(...)
 	#define gpio_linux_output_init(...)
+	#define gpio_linux_input_init(...)
 
 #else
 
@@ -18,7 +20,9 @@
 	#define gpio_shift_register_init(...)
 
 	int gpio_linux_set(int addr, int val);
+	int gpio_linux_get(int addr);
 	void gpio_linux_output_init(int addr);
+	void gpio_linux_input_init(int addr);
 #endif
 
 typedef int gpio_t;
