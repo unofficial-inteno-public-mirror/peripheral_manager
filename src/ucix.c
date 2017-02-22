@@ -72,6 +72,9 @@ struct uci_context* ucix_init_path(const char *vpath, const char *config_file, i
 	return ctx;
 }
 
+/*
+* Note: the ul->val is allocated with strdup.
+* It has to be free()'d explicitly when free()'ing the list */
 int ucix_get_option_list(struct uci_context *ctx, const char *p,
 	const char *s, const char *o, struct list_head *l)
 {
@@ -104,6 +107,9 @@ int ucix_get_option_list(struct uci_context *ctx, const char *p,
 	return 0;
 }
 
+/*
+* Note: the return string is allocated with strdup.
+* It has to be free()'d explicitly when it is no longer needed. */
 char* ucix_get_option(struct uci_context *ctx, const char *p, const char *s, const char *o)
 {
 	struct uci_element *e = NULL;
