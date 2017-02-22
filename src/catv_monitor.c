@@ -237,6 +237,11 @@ void catv_monitor_init(struct server_ctx *s_ctx)
 
 void catv_monitor_set_socket(char *socket_name)
 {
-        if (socket_name)
-                ubus_socket = strdup(socket_name);
+	if (!socket_name)
+		return;
+	if (ubus_socket) {
+		free(ubus_socket);
+		ubus_socket = NULL;
+	}
+	ubus_socket = strdup(socket_name);
 }
