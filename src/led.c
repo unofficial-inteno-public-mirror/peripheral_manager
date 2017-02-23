@@ -488,6 +488,7 @@ static int led_status_method(struct ubus_context *ubus_ctx, struct ubus_object *
 	blobmsg_add_string(&bblob, "state",fn_actions[leds[led_idx].state]);
 	blobmsg_add_u32(&bblob, "brightness",leds[led_idx].brightness);
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+	blob_buf_free(&bblob);
 
 	return 0;
 }
@@ -556,6 +557,7 @@ static int leds_status_method(struct ubus_context *ubus_ctx, struct ubus_object 
 	blobmsg_add_string(&bblob, "state", leds_states[global_state]);
 	DBG(1,"leds global state is [%s]",leds_states[global_state]);
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+	blob_buf_free(&bblob);
 	return 0;
 }
 

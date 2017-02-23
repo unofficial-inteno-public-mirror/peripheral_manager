@@ -31,6 +31,7 @@ static void button_ubus_interface_event(struct ubus_context *ubus_ctx, char *but
 	blobmsg_add_string(&bblob, "action", pressed ? "pressed" : "released");
 	blobmsg_add_string(&bblob, "type", longpress ? "long" : "short");
 	ubus_send_event(ubus_ctx, s, bblob.head);
+        blob_buf_free(&bblob);
 }
 
 
@@ -386,6 +387,7 @@ static int button_state_method(struct ubus_context *ubus_ctx, struct ubus_object
 		blobmsg_add_string(&bblob, "state", "error");
 	}
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+        blob_buf_free(&bblob);
 	return 0;
 }
 
@@ -402,6 +404,7 @@ static int button_press_method(struct ubus_context *ubus_ctx, struct ubus_object
 	else
 		blobmsg_add_string(&bblob, "return", "ok");
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+        blob_buf_free(&bblob);
 	return 0;
 }
 
@@ -415,6 +418,7 @@ static int button_press_long_method(struct ubus_context *ubus_ctx, struct ubus_o
 	else
 		blobmsg_add_string(&bblob, "return", "ok");
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+        blob_buf_free(&bblob);
 	return 0;
 }
 
@@ -439,6 +443,7 @@ static int buttons_state_method(struct ubus_context *ubus_ctx, struct ubus_objec
 		}
 	}
 	ubus_send_reply(ubus_ctx, req, bblob.head);
+        blob_buf_free(&bblob);
 	return 0;
 }
 

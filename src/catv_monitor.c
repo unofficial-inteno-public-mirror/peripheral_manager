@@ -73,6 +73,8 @@ static int is_enabled(void)
         if (ret)
                 DBG(1,"catv_monitor: ret = %s", ubus_strerror(ret));
 
+        blob_buf_free(&b);
+
         return enabled;
 }
 
@@ -177,6 +179,8 @@ static void catv_monitor_handler(struct uloop_timeout *timeout)
                 ret = ubus_invoke(ubus_ctx, id, "vpd", b.head, catv_vpd_cb, 0, 3000);
                 if (ret)
                         DBG(1,"ret = %s", ubus_strerror(ret));
+                blob_buf_free(&b);
+
         }else
                 state = STATE_OFF;
 
@@ -214,6 +218,7 @@ static void set_led(state_t lstate)
 
         if (ubus_lookup_id(ubus_ctx, "led.ext", &id)) {
 		DBG(1, "Failed to look up led.ext object\n");
+                blob_buf_free(&b);
 		return;
 	}
 
@@ -221,6 +226,8 @@ static void set_led(state_t lstate)
 
         if ( ret )
                 DBG(1,"catv_monitor: set led failed [%s]", ubus_strerror(ret));
+
+        blob_buf_free(&b);
 }
 
 void catv_monitor_init(struct server_ctx *s_ctx)
