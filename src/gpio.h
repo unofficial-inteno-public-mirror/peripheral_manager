@@ -1,6 +1,8 @@
 #ifndef GPIO_H
 #define GPIO_H
 
+#include "config.h"
+
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
@@ -12,7 +14,6 @@
 	#define gpio_linux_input_init(...)
 
 #else
-
 	#define BOARD_IOCTL_SET_GPIO 1
 	#define BOARD_IOCTL_LED_CTRL 2
 	#define BOARD_IOCTL_GET_GPIO 3

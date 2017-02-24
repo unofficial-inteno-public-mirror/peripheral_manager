@@ -30,7 +30,6 @@ peripheral_manager_SOURCES = \
 	src/sx9512.c \
 	src/sx9512.h \
 	src/gpio.h \
-	src/gpio_linux.c \
 	src/gpio_led.c \
 	src/gpio_led.h \
 	src/gpio_button.c \
@@ -72,6 +71,9 @@ eco_bug_SOURCES = \
 	src/eco_bug.c \
 	src/gpio.c \
 	src/gpio.h
+else
+peripheral_manager_SOURCES += \
+	src/gpio_linux.c 
 
 endif
 
