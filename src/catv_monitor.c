@@ -67,7 +67,7 @@ static int is_enabled(void)
 
         memset(&b, 0, sizeof(struct blob_buf));
         blob_buf_init(&b, 0);
-
+        DBG(1,"catv_monitor: call status on catv object");
         ret = ubus_invoke(ubus_ctx, id, "status", b.head, catv_status_cb, &enabled, 3000);
 
         if (ret)
@@ -155,6 +155,7 @@ static void catv_monitor_handler(struct uloop_timeout *timeout)
 	uint32_t id;
         struct blob_buf b;
         int ret;
+        int delay = CATV_MONITOR_TIME;
 
         /* start to set new state to OK */
         /* then checks turn on different errors */
@@ -181,12 +182,15 @@ static void catv_monitor_handler(struct uloop_timeout *timeout)
                         DBG(1,"ret = %s", ubus_strerror(ret));
                 blob_buf_free(&b);
 
-        }else
+        }else{
                 state = STATE_OFF;
+                delay *= 10;
+        }
 
         set_led(state);
 
-        uloop_timeout_set(&catv_monitor_timer, CATV_MONITOR_TIME);
+        uloop_timeout_set(&catv_monitor_timer, delay);
+
 }
 
 static void set_led(state_t lstate)
