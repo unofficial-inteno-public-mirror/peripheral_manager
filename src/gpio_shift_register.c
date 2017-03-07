@@ -9,9 +9,9 @@ int gpio_shift_register_init(gpio_shift_register_t *p, gpio_t gpio_clk, gpio_t g
 	p->mask=gpio_mask;
 	p->size=size;
 	p->state_cache=0;
-	gpio_set_state(p->clk, 0);
-	gpio_set_state(p->dat, 0);
-	gpio_set_state(p->mask, 0);
+	gpio_set_state(p->clk, 0, 0);
+	gpio_set_state(p->dat, 0, 0);
+	gpio_set_state(p->mask, 0, 0);
 	return 0;
 }
 
@@ -20,13 +20,13 @@ void gpio_shift_register_set(gpio_shift_register_t *p, int state)
 	int i;
 	if(!p->size)
 		return;
-	gpio_set_state(p->mask, 0); //mask low
+	gpio_set_state(p->mask, 0, 0); //mask low
 	for(i=p->size; i; i--) {
-		gpio_set_state(p->clk, 0); //clk low
-		gpio_set_state(p->dat, (state>>(i-1)) & 1); //place bit
-		gpio_set_state(p->clk, 1); //clk high
+		gpio_set_state(p->clk, 0, 0); //clk low
+		gpio_set_state(p->dat, (state>>(i-1)) & 1, 0); //place bit
+		gpio_set_state(p->clk, 1, 0); //clk high
 	}
-	gpio_set_state(p->mask, 1); //mask high / sreg load
+	gpio_set_state(p->mask, 1, 0); //mask high / sreg load
 	p->state_cache=state; //update internal register copy
 }
 

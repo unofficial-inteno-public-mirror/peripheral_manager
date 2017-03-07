@@ -30,6 +30,7 @@ typedef enum {
 
 struct gpio_led_data {
 	int addr;
+	int delay;		/* time to wait for a gpio set to complete, HW workaround, do not set normally */
 	active_t active;
 	int state;
 	gpio_mode_t mode;
@@ -53,7 +54,7 @@ static int gpio_led_set_state(struct led_drv *drv, led_state_t state)
 
 	switch (p->mode) {
 	case DIRECT:
-		board_ioctl( BOARD_IOCTL_SET_GPIO, 0, 0, NULL, p->addr, bit_val);
+		gpio_set_state(p->addr, bit_val,p->delay);
 		break;
 	case GPIO_LINUX:
 		gpio_linux_set(p->addr, bit_val);
@@ -88,7 +89,7 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 
 	LIST_HEAD(leds);
 	struct ucilist *node;
-	int gpio_shiftreg_clk=0, gpio_shiftreg_dat=1, gpio_shiftreg_mask=2, gpio_shiftreg_bits=0;
+	int gpio_shiftreg_clk=-1, gpio_shiftreg_dat=-1, gpio_shiftreg_mask=-1, gpio_shiftreg_bits=0;
 	char *s;
 
 	DBG(1, "");
@@ -124,6 +125,12 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 			data->addr =  strtol(s,0,0);
 		}
 
+		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->led.name, "delay");
+		DBG(1, "delay = [%s]", s);
+		if (s) {
+			data->delay =  strtol(s,0,0);
+		}
+
 		s = ucix_get_option(s_ctx->uci_ctx, "hw" , data->led.name, "mode");
 		DBG(1, "mode = [%s]", s);
 		if (s) {
@@ -155,5 +162,7 @@ void gpio_led_init(struct server_ctx *s_ctx) {
 		led_add(&data->led);
 	}
 	gpio_init();
-	gpio_shift_register_init(&led_gpio_shift_register, gpio_shiftreg_clk, gpio_shiftreg_dat, gpio_shiftreg_mask, gpio_shiftreg_bits);
+
+	if (gpio_shiftreg_clk != -1)
+		gpio_shift_register_init(&led_gpio_shift_register, gpio_shiftreg_clk, gpio_shiftreg_dat, gpio_shiftreg_mask, gpio_shiftreg_bits);
 }

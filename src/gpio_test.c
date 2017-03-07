@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 		}
 		if(verbose)
 			printf("Set gpio %d state to %d\n", pin, state);
-		gpio_set_state(pin, state);
+		gpio_set_state(pin, state, 0);
 		break;
 	case CMD_SH_SET:
 		pin_clk=strtol(argv[optind],NULL,0);

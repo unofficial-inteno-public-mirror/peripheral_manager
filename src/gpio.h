@@ -38,6 +38,6 @@ int board_ioctl(int ioctl_id, int action, int hex, char* string_buf, int string_
 
 #define gpio_init() board_ioctl_init()
 gpio_state_t gpio_get_state(gpio_t gpio);
-void gpio_set_state(gpio_t gpio, gpio_state_t state);
+void gpio_set_state(gpio_t gpio, gpio_state_t state,int udelay);
 
 #endif /* GPIO_H */

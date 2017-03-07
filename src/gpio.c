@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <syslog.h>
 #include <string.h>
 #include <sys/types.h>
@@ -10,7 +11,6 @@
 
 static int brcmboard = -1;
 
-
 int board_ioctl_init(void) {
 	if (brcmboard == -1){
 		brcmboard = open(DEVFILE_BRCM_BOARD, O_RDWR);
@@ -22,7 +22,6 @@ int board_ioctl_init(void) {
 	}
 	return 0;
 }
-
 
 int board_ioctl(int ioctl_id, int action, int hex, char* string_buf, int string_buf_len, int offset) {
 	BOARD_IOCTL_PARMS IoctlParms = {0};
@@ -44,13 +43,14 @@ int board_ioctl(int ioctl_id, int action, int hex, char* string_buf, int string_
 	return IoctlParms.result;
 }
 
-
 gpio_state_t gpio_get_state(gpio_t gpio)
 {
 	return board_ioctl(BOARD_IOCTL_GET_GPIO, 0, 0, NULL, gpio, 0);
 }
 
-void gpio_set_state(gpio_t gpio, gpio_state_t state)
+void gpio_set_state(gpio_t gpio, gpio_state_t state, int udelay)
 {
 	board_ioctl(BOARD_IOCTL_SET_GPIO, 0, 0, NULL, gpio, state);
+	if (udelay)
+		usleep(udelay);
 }
