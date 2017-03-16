@@ -80,9 +80,25 @@ static led_state_t gpio_led_get_state(struct led_drv *drv)
 	return p->state;
 }
 
+static int gpio_led_support(struct led_drv *drv, led_state_t state)
+{
+	switch (state) {
+
+	case OFF:
+	case ON:
+		return 1;
+		break;
+
+	default:
+		return 0;
+	}
+	return 0;
+}
+
 static struct led_drv_func func = {
 	.set_state = gpio_led_set_state,
 	.get_state = gpio_led_get_state,
+	.support   = gpio_led_support,
 };
 
 void gpio_led_init(struct server_ctx *s_ctx) {

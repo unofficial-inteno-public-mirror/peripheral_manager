@@ -156,9 +156,25 @@ static led_state_t sx9512_led_get_state(struct led_drv *drv)
 	return p->state;
 }
 
+static int sx9512_led_support(struct led_drv *drv, led_state_t state)
+{
+	switch (state) {
+
+	case OFF:
+	case ON:
+		return 1;
+		break;
+
+	default:
+		return 0;
+	}
+	return 0;
+}
+
 static struct led_drv_func led_func = {
 	.set_state = sx9512_led_set_state,
 	.get_state = sx9512_led_get_state,
+	.support   = sx9512_led_support,
 };
 
 struct button_data {
