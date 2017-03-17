@@ -87,7 +87,7 @@ gpio_state_t gpio_get_state(gpio_t gpio)
 	return 0;
 }
 
-void gpio_set_state(gpio_t gpio, gpio_state_t state)
+void gpio_set_state(gpio_t gpio, gpio_state_t state, int delay)
 {
 
 }
