@@ -39,7 +39,7 @@ peripheral_manager_SOURCES = \
 
 if BRCM_BOARD
 
-bin_PROGRAMS += vox_test gpio_test eco_bug
+bin_PROGRAMS += vox_test eco_bug
 
 peripheral_manager_SOURCES += \
 	src/gpio.c \
@@ -53,19 +53,6 @@ vox_test_SOURCES = \
 	src/vox_test.c \
 	src/gpio.c \
 	src/gpio.h
-
-gpio_test_SOURCES = \
-	src/gpio_test.c \
-	src/gpio.c \
-	src/gpio.h \
-	src/gpio_shift_register.c \
-	src/gpio_shift_register.h \
-	src/smbus.c \
-	src/smbus.h \
-	src/i2c.c \
-	src/i2c.h \
-	src/sx9512.c \
-	src/sx9512.h
 
 eco_bug_SOURCES = \
 	src/eco_bug.c \
